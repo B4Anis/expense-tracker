@@ -123,6 +123,32 @@ DeleteButton
             if price_item:
                 total += float(price_item.text())
         self.total_value.setText(f"{total:.2f}")
+          def validate_input(self, expense_name, price_text):
+        if not expense_name:
+            self.show_message("Error", "Expense field must be filled.")
+            return False
+        
+        if not price_text or not self.is_numeric(price_text):
+            self.show_message("Error", "Price must be a valid number.")
+            return False
+        
+        return True
+
+    @staticmethod
+    def is_numeric(value):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def show_message(title, message):
+        msg_box = QMessageBox()
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.exec_()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
