@@ -49,10 +49,13 @@ class ExpenseApp(QMainWindow):
         add_button = QPushButton("Add Expense")
         add_button.clicked.connect(self.add_expense)
 
+DeleteButton
         # Create the button to delete expenses
         delete_button = QPushButton("Delete Expense")
         delete_button.clicked.connect(self.delete_expense)
 
+
+ main
         # Add widgets to the top panel
         top_panel.addWidget(expense_label)
         top_panel.addWidget(self.expense_input)
@@ -60,6 +63,7 @@ class ExpenseApp(QMainWindow):
         top_panel.addWidget(self.price_input)
         top_panel.addWidget(add_button)
         top_panel.addWidget(delete_button)
+
 
         # Create the table to display expenses
         self.table = QTableWidget()
@@ -101,7 +105,7 @@ class ExpenseApp(QMainWindow):
 
         # Update the total
         self.update_total()
-
+        
     def delete_expense(self):
         # Get the selected row
         selected_row = self.table.currentRow()
