@@ -1,10 +1,50 @@
 import sys
+import sqlite3
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QTableWidget, QTableWidgetItem, 
-    QLineEdit, QLabel, QPushButton, QMenuBar, QMenu
+    QLineEdit, QLabel, QPushButton, QMenuBar, QMenu, QMessageBox
 )
 from PyQt5.QtCore import Qt
+
+class DatabaseManager:
+    def __init__(self, db_name='expenses.db'):
+        self.connection = sqlite3.connect(db_name)
+        self.create_table()
+
+    def create_table(self):
+        with self.connection:
+            self.connection.execute('''
+                CREATE TABLE IF NOT EXISTS expenses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    expense_name TEXT UNIQUE NOT NULL,
+                    price REAL NOT NULL
+                )
+            ''')
+
+    def insert_expense(self, expense_name, price):
+        with self.connection:
+            try:
+                self.connection.execute('''
+                    INSERT INTO expenses (expense_name, price) VALUES (?, ?)
+                ''', (expense_name, price))
+            except sqlite3.IntegrityError:
+                raise ValueError(f"Expense '{expense_name}' already exists.")
+
+    def delete_expense(self, expense_name):
+        with self.connection:
+            self.connection.execute('''
+                DELETE FROM expenses WHERE expense_name = ?
+            ''', (expense_name,))
+
+    def fetch_expenses(self):
+        cursor = self.connection.cursor()
+        cursor.execute('SELECT expense_name, price FROM expenses')
+        return cursor.fetchall()
+
+    def close(self):
+        self.connection.close()
+
 
 class ExpenseApp(QMainWindow):
     def __init__(self):
@@ -12,7 +52,10 @@ class ExpenseApp(QMainWindow):
 
         # Set up the main window
         self.setWindowTitle("Expense Tracker")
-        self.setGeometry(100, 100, 600, 300)
+        self.setGeometry(100, 100, 600, 400)
+
+        # Initialize the Database Manager
+        self.db_manager = DatabaseManager()
 
         # Create a central widget and set it as the central widget of the QMainWindow
         central_widget = QWidget(self)
@@ -49,13 +92,10 @@ class ExpenseApp(QMainWindow):
         add_button = QPushButton("Add Expense")
         add_button.clicked.connect(self.add_expense)
 
-DeleteButton
         # Create the button to delete expenses
         delete_button = QPushButton("Delete Expense")
         delete_button.clicked.connect(self.delete_expense)
 
-
- main
         # Add widgets to the top panel
         top_panel.addWidget(expense_label)
         top_panel.addWidget(self.expense_input)
@@ -63,7 +103,6 @@ DeleteButton
         top_panel.addWidget(self.price_input)
         top_panel.addWidget(add_button)
         top_panel.addWidget(delete_button)
-
 
         # Create the table to display expenses
         self.table = QTableWidget()
@@ -79,76 +118,71 @@ DeleteButton
         total_layout.addWidget(self.total_value)
         layout.addLayout(total_layout)
 
-        # Initialize with default data
-        self.table.setRowCount(3)
-        initial_data = [("Veg", 40.0), ("Fruit", 70.0), ("Fuel", 60.0)]
-        for row, (expense, price) in enumerate(initial_data):
-            self.table.setItem(row, 0, QTableWidgetItem(expense))
-            self.table.setItem(row, 1, QTableWidgetItem(str(price)))
-        
+        # Load initial data from the database
+        self.load_expenses()
+
+    def load_expenses(self):
+        """Load expenses from the database and populate the table."""
+        expenses = self.db_manager.fetch_expenses()
+        self.table.setRowCount(0)  # Clear existing rows
+        for expense_name, price in expenses:
+            self.add_expense_to_table(expense_name, price)
         self.update_total()
 
     def add_expense(self):
-        # Get the values from the input fields
+        """Add a new expense to the database and table."""
         expense_name = self.expense_input.text().strip()
         price_text = self.price_input.text().strip()
 
-        # Add a new row to the table
+        if not expense_name or not price_text:
+            QMessageBox.warning(self, "Input Error", "Please enter both expense name and price.")
+            return
+
+        try:
+            price = float(price_text)
+            self.db_manager.insert_expense(expense_name, price)
+            self.add_expense_to_table(expense_name, price)
+
+            # Clear input fields
+            self.expense_input.clear()
+            self.price_input.clear()
+            self.update_total()
+        except ValueError as e:
+            QMessageBox.warning(self, "Input Error", str(e))
+
+    def add_expense_to_table(self, expense_name, price):
+        """Add expense to the table."""
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
         self.table.setItem(row_position, 0, QTableWidgetItem(expense_name))
-        self.table.setItem(row_position, 1, QTableWidgetItem(price_text))
+        self.table.setItem(row_position, 1, QTableWidgetItem(str(price)))
 
-        # Clear the input fields
-        self.expense_input.clear()
-        self.price_input.clear()
-
-        # Update the total
-        self.update_total()
-        
     def delete_expense(self):
-        # Get the selected row
+        """Delete an expense from the database and the table."""
         selected_row = self.table.currentRow()
-        if selected_row >= 0:
-            # Remove the selected row
-            self.table.removeRow(selected_row)
-            # Update the total
-            self.update_total()
+        if selected_row < 0:
+            QMessageBox.warning(self, "Selection Error", "Please select an expense to delete.")
+            return
+        
+        expense_name = self.table.item(selected_row, 0).text()
+        self.db_manager.delete_expense(expense_name)
+        self.table.removeRow(selected_row)
+        self.update_total()
 
     def update_total(self):
-        # Calculate the total price
+        """Calculate and update the total price."""
         total = 0.0
         for row in range(self.table.rowCount()):
             price_item = self.table.item(row, 1)
             if price_item:
                 total += float(price_item.text())
         self.total_value.setText(f"{total:.2f}")
-          def validate_input(self, expense_name, price_text):
-        if not expense_name:
-            self.show_message("Error", "Expense field must be filled.")
-            return False
-        
-        if not price_text or not self.is_numeric(price_text):
-            self.show_message("Error", "Price must be a valid number.")
-            return False
-        
-        return True
 
-    @staticmethod
-    def is_numeric(value):
-        try:
-            float(value)
-            return True
-        except ValueError:
-            return False
+    def closeEvent(self, event):
+        """Handle the window close event."""
+        self.db_manager.close()
+        event.accept()
 
-    @staticmethod
-    def show_message(title, message):
-        msg_box = QMessageBox()
-        msg_box.setWindowTitle(title)
-        msg_box.setText(message)
-        msg_box.setIcon(QMessageBox.Warning)
-        msg_box.exec_()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
